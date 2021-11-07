@@ -140,7 +140,16 @@ public class CommentDao extends AbstractMFlixDao {
         // TIP: make sure to match only users that own the given commentId
         // TODO> Ticket Handling Errors - Implement a try catch block to
         // handle a potential write exception when given a wrong commentId.
-        return false;
+        try {
+            Comment deletedComment = commentCollection.findOneAndDelete(
+                    and(eq("_id", new ObjectId(commentId)), eq("email", email))
+            );
+            return deletedComment != null;
+        } catch (MongoException mongoException) {
+            log.error(mongoException.getMessage(), mongoException);
+            return false;
+        }
+
     }
 
     /**
