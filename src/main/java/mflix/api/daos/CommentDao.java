@@ -1,6 +1,7 @@
 package mflix.api.daos;
 
 import com.mongodb.MongoClientSettings;
+import com.mongodb.MongoException;
 import com.mongodb.MongoWriteException;
 import com.mongodb.ReadConcern;
 import com.mongodb.client.MongoClient;
@@ -29,6 +30,9 @@ import java.util.ArrayList;
 import java.util.Date;
 import java.util.List;
 
+import static com.mongodb.client.model.Filters.and;
+import static com.mongodb.client.model.Filters.eq;
+import static com.mongodb.client.model.Updates.set;
 import static org.bson.codecs.configuration.CodecRegistries.fromProviders;
 import static org.bson.codecs.configuration.CodecRegistries.fromRegistries;
 
@@ -81,7 +85,16 @@ public class CommentDao extends AbstractMFlixDao {
         // comment.
         // TODO> Ticket - Handling Errors: Implement a try catch block to
         // handle a potential write exception when given a wrong commentId.
-        return null;
+        try {
+            if (comment.getOid() == null) {
+                throw new IncorrectDaoOperation("Cannot save comment without id");
+            }
+            commentCollection.insertOne(comment);
+            return commentCollection.find(eq("_id", comment.getOid())).first();
+        } catch (MongoException exception) {
+            log.error(exception.getMessage(), exception);
+            throw new IncorrectDaoOperation(exception.getMessage());
+        }
     }
 
     /**
@@ -103,7 +116,15 @@ public class CommentDao extends AbstractMFlixDao {
         // user own comments
         // TODO> Ticket - Handling Errors: Implement a try catch block to
         // handle a potential write exception when given a wrong commentId.
-        return false;
+        try {
+            UpdateResult commentUpdateResult = commentCollection.updateOne(
+                    and(eq("_id", new ObjectId(commentId)), eq("email", email)),
+                    set("text", text));
+            return commentUpdateResult.getMatchedCount() > 0;
+        } catch (MongoException mongoException) {
+            log.error(mongoException.getMessage(), mongoException);
+            throw new IncorrectDaoOperation(mongoException.getMessage());
+        }
     }
 
     /**
