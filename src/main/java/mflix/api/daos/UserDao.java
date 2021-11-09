@@ -71,7 +71,7 @@ public class UserDao extends AbstractMFlixDao {
             return true;
         } catch (MongoException mongoException) {
             log.error(mongoException.getMessage(), mongoException);
-            throw new IncorrectDaoOperation(mongoException.getMessage());
+            return false;
         }
         //TODO > Ticket: Handling Errors - make sure to only add new users
         // and not users that already exist.
@@ -134,7 +134,13 @@ public class UserDao extends AbstractMFlixDao {
     public boolean deleteUserSessions(String userId) {
         log.info("deleteUserSessions: {}", userId);
         //TODO> Ticket: User Management - implement the delete user sessions method
-        return sessionsCollection.deleteMany(eq("user_id", userId)).wasAcknowledged();
+        try {
+            sessionsCollection.deleteMany(eq("user_id", userId));
+            return true;
+        } catch (MongoException mongoException) {
+            log.error(mongoException.getMessage(), mongoException);
+            return false;
+        }
     }
 
     /**

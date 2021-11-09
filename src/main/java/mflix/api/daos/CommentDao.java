@@ -2,22 +2,15 @@ package mflix.api.daos;
 
 import com.mongodb.MongoClientSettings;
 import com.mongodb.MongoException;
-import com.mongodb.MongoWriteException;
 import com.mongodb.ReadConcern;
 import com.mongodb.client.MongoClient;
 import com.mongodb.client.MongoCollection;
-import com.mongodb.client.model.Aggregates;
-import com.mongodb.client.model.Filters;
-import com.mongodb.client.model.Sorts;
-import com.mongodb.client.model.Updates;
-import com.mongodb.client.result.DeleteResult;
 import com.mongodb.client.result.UpdateResult;
 import mflix.api.models.Comment;
 import mflix.api.models.Critic;
 import org.bson.Document;
 import org.bson.codecs.configuration.CodecRegistry;
 import org.bson.codecs.pojo.PojoCodecProvider;
-import org.bson.conversions.Bson;
 import org.bson.types.ObjectId;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -25,9 +18,8 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 
-import java.text.MessageFormat;
 import java.util.ArrayList;
-import java.util.Date;
+import java.util.Arrays;
 import java.util.List;
 
 import static com.mongodb.client.model.Filters.and;
@@ -41,8 +33,9 @@ public class CommentDao extends AbstractMFlixDao {
 
     public static String COMMENT_COLLECTION = "comments";
     private final Logger log;
-    private MongoCollection<Comment> commentCollection;
-    private CodecRegistry pojoCodecRegistry;
+    private final MongoCollection<Comment> commentCollection;
+    private final CodecRegistry pojoCodecRegistry;
+    private final MongoCollection<Critic> criticMongoCollection;
 
     @Autowired
     public CommentDao(
@@ -56,6 +49,10 @@ public class CommentDao extends AbstractMFlixDao {
                         fromProviders(PojoCodecProvider.builder().automatic(true).build()));
         this.commentCollection =
                 db.getCollection(COMMENT_COLLECTION, Comment.class).withCodecRegistry(pojoCodecRegistry);
+        this.criticMongoCollection =
+                db.getCollection(COMMENT_COLLECTION, Critic.class)
+                        .withReadConcern(ReadConcern.MAJORITY)
+                        .withCodecRegistry(pojoCodecRegistry);
     }
 
     /**
@@ -167,6 +164,16 @@ public class CommentDao extends AbstractMFlixDao {
         // // guarantee for the returned documents. Once a commenter is in the
         // // top 20 of users, they become a Critic, so mostActive is composed of
         // // Critic objects.
+
+        criticMongoCollection.aggregate(Arrays.asList(
+                new Document("$group",
+                        new Document("_id", "$email").append("count", new Document("$sum", 1L))
+                ),
+                new Document("$sort", new Document("count", -1L)),
+                new Document("$limit", 20L))
+        ).into(mostActive);
+
+
         return mostActive;
     }
 }
